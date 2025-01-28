@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>지수함수와 로그함수의 관계</title>
+
+<!-- MathJax 로드 -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+<style>
+  body {
+    background-color: #ffffff;
+    color: #000000;
+    font-family: sans-serif;
+    margin: 20px;
+  }
+  h1 {
+    margin-bottom: 10px;
+  }
+  .info-box {
+    margin-bottom: 10px;
+  }
+  .energy-bar-container {
+    width: 200px;
+    height: 20px;
+    background-color: #ccc;
+    margin-bottom: 20px;
+    overflow: hidden;
+    position: relative;
+  }
+  .energy-bar {
+    height: 100%;
+    background-color: #000000;
+    width: 100%;
+    transition: width 0.2s linear;
+  }
+  .question-container {
+    border: 1px solid #000;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .choice {
+    margin: 5px 0;
+  }
+  .correct-answer {
+    color: green;
+    font-weight: bold;
+    margin-top: 10px;
+  }
+  .hidden {
+    display: none;
+  }
+  .response-message {
+    white-space: pre-wrap;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<h1>지수함수와 로그함수의 관계</h1>
+
+<div class="info-box">
+  <label for="playerName">이름 입력:</label>
+  <input type="text" id="playerName" placeholder="이름을 입력하세요">
+</div>
+
+<div class="info-box">
+  난이도를 선택하세요:
+  <select id="difficultySelect">
+    <option value="top">최상 (20초 제한, 문제당 20점)</option>
+    <option value="high">상 (30초 제한, 문제당 15점)</option>
+    <option value="medium">중 (40초 제한, 문제당 13점)</option>
+    <option value="low">하 (시간 제한 없음, 문제당 10점)</option>
+  </select>
+</div>
+
+<button id="startBtn">게임 시작</button>
+
+<div class="info-box">
+  <span>남은 기회: <span id="lives">3</span></span>
+  &nbsp;|&nbsp;
+  <span>총 점수: <span id="score">0</span></span>
+  &nbsp;|&nbsp;
+  <span>전체 게임 시간: <span id="totalTime">0</span>초</span>
+</div>
+
+<div class="energy-bar-container hidden" id="energyBarContainer">
+  <div class="energy-bar" id="energyBar"></div>
+</div>
+
+<div id="questionArea" class="question-container hidden">
+  <div id="questionText"></div>
+  <div id="choices"></div>
+  <div id="correctAnswer" class="correct-answer hidden"></div>
+</div>
+
+<button id="nextBtn" class="hidden">다음 문제</button>
+<button id="submitScoreBtn" class="hidden">점수 전송</button>
+<div id="response" class="response-message"></div>
+
+<script>
+// -----------------------------
+// 1. 문제 데이터
+// (문제 번호는 표시하지 않으며, 모든 수식은 \\(...\\) 형태로 작성)
+// -----------------------------
+const allQuestions = [
+  {
+    question: "함수 \\( f(x) = \\log_{\\dfrac{1}{3}}(1 - x) \\)의 역함수 \\( f^{-1}(3) \\)의 값은?",
+    choices: [
+      { text: "\\(\\dfrac{26}{27}\\)", correct: true },
+      { text: "\\(\\dfrac{8}{9}\\)", correct: false },
+      { text: "\\(\\dfrac{2}{3}\\)", correct: false },
+      { text: "\\(\\dfrac{1}{27}\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( f(x) = \\log_{\\dfrac{1}{3}}(1 - x) \\)의 역함수 \\( f^{-1}(1) \\)의 값은?",
+    choices: [
+      { text: "\\(\\dfrac{2}{3}\\)", correct: true },
+      { text: "\\(\\dfrac{1}{3}\\)", correct: false },
+      { text: "\\(\\dfrac{3}{4}\\)", correct: false },
+      { text: "\\(\\dfrac{1}{2}\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( f(x) = \\log_{\\dfrac{1}{3}}(1 - x) \\)의 역함수 \\( f^{-1}(2) \\)의 값은?",
+    choices: [
+      { text: "\\(\\dfrac{8}{9}\\)", correct: true },
+      { text: "\\(\\dfrac{1}{9}\\)", correct: false },
+      { text: "\\(\\dfrac{3}{4}\\)", correct: false },
+      { text: "\\(\\dfrac{2}{3}\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( f(x) = \\log_{4}(x + 2) + 1 \\)의 역함수 \\( f^{-1}(2) \\)의 값은?",
+    choices: [
+      { text: "2", correct: true },
+      { text: "14", correct: false },
+      { text: "0", correct: false },
+      { text: "\\(\\dfrac{1}{2}\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( f(x) = 4^x \\)의 역함수 \\( f^{-1}(2) \\)의 값은?",
+    choices: [
+      { text: "\\(\\dfrac{1}{2}\\)", correct: true },
+      { text: "2", correct: false },
+      { text: "\\(-\\dfrac{1}{2}\\)", correct: false },
+      { text: "4", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( f(x) = 4^x \\)의 역함수 \\( f^{-1}(16) \\)의 값은?",
+    choices: [
+      { text: "1", correct: false },
+      { text: "2", correct: true },
+      { text: "3", correct: false },
+      { text: "4", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( f(x) = 2^x \\)의 역함수 \\( g(x) \\)에 대해 \\( g\\bigl(\\dfrac{1}{8}\\bigr) \\)의 값은?",
+    choices: [
+      { text: "-3", correct: true },
+      { text: "-2", correct: false },
+      { text: "3", correct: false },
+      { text: "8", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( f(x) = 2^x \\)에 대해 \\( f(3) \\)의 값은?",
+    choices: [
+      { text: "6", correct: false },
+      { text: "8", correct: true },
+      { text: "9", correct: false },
+      { text: "16", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = \\bigl(\\dfrac{1}{2}\\bigr)^{x-1} \\)의 역함수는?",
+    choices: [
+      { text: "\\(y = \\log_{\\dfrac{1}{2}} x + 1\\)", correct: true },
+      { text: "\\(y = \\log_{2} x + 1\\)", correct: false },
+      { text: "\\(y = \\log_{\\dfrac{1}{2}} (x - 1)\\)", correct: false },
+      { text: "\\(y = \\log_{2} (x + 1)\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = 10^x \\)의 역함수는?",
+    choices: [
+      { text: "\\(y = \\ln x\\)", correct: false },
+      { text: "\\(y = \\log x\\)", correct: true },
+      { text: "\\(y = \\log_{2} x\\)", correct: false },
+      { text: "\\(y = \\log_{10} x\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = \\bigl(\\dfrac{1}{3}\\bigr)^x \\)의 역함수는?",
+    choices: [
+      { text: "\\(y = \\log_{3} x\\)", correct: false },
+      { text: "\\(y = \\log_{\\dfrac{1}{3}} x\\)", correct: true },
+      { text: "\\(y = 3^x\\)", correct: false },
+      { text: "\\(y = \\bigl(\\dfrac{1}{3}\\bigr)^x\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = 5^{x+2} - 3 \\)의 역함수는?",
+    choices: [
+      { text: "\\(y = \\log_{5} (x - 3) + 2\\)", correct: false },
+      { text: "\\(y = \\log_{5} (x + 3) - 2\\)", correct: true },
+      { text: "\\(y = \\log_{5} (x + 2) - 3\\)", correct: false },
+      { text: "\\(y = \\log_{5} (x - 2) + 3\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = 2^x \\)의 역함수는?",
+    choices: [
+      { text: "\\(y = \\log_{2} x\\)", correct: true },
+      { text: "\\(y = \\log_{10} x\\)", correct: false },
+      { text: "\\(y = \\ln x\\)", correct: false },
+      { text: "\\(y = \\log_{5} x\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = 10^{\\bigl(\\dfrac{x}{2}-3\\bigr)} \\)의 역함수는?",
+    choices: [
+      { text: "\\(y = 2(\\log x + 3)\\)", correct: true },
+      { text: "\\(y = 2(\\log x - 3)\\)", correct: false },
+      { text: "\\(y = \\log(x + 3)\\)", correct: false },
+      { text: "\\(y = \\log(x - 3)\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = 2 \\cdot 5^{x+1} \\)의 역함수는?",
+    choices: [
+      { text: "\\(y = \\log_{5}\\bigl(\\dfrac{x}{2}\\bigr) - 1\\)", correct: true },
+      { text: "\\(y = \\log_{5}(2x) + 1\\)", correct: false },
+      { text: "\\(y = \\log_{5}\\bigl(\\dfrac{x}{2}\\bigr) + 1\\)", correct: false },
+      { text: "\\(y = \\log_{5}(2x) - 1\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = 3^{x-1} + 2 \\)의 역함수는?",
+    choices: [
+      { text: "\\(y = \\log_{3}(x - 2) + 1\\)", correct: true },
+      { text: "\\(y = \\log_{3}(x + 2) - 1\\)", correct: false },
+      { text: "\\(y = \\log_{3}(x - 1) + 2\\)", correct: false },
+      { text: "\\(y = \\log_{3}(x + 1) - 2\\)", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = f(x) \\)의 그래프와 함수 \\( y = \\log_{\\dfrac{1}{3}}(x + a) - 1 \\)의 그래프가 직선 \\( y = x \\)에 대하여 대칭이고, 점 \\((-2, 1)\\)이 함수 \\( y = f(x) \\)의 그래프 위의 점일 때, 상수 \\( a \\)의 값은?",
+    choices: [
+      { text: "2", correct: true },
+      { text: "3", correct: false },
+      { text: "4", correct: false },
+      { text: "5", correct: false }
+    ]
+  },
+  {
+    question: "로그함수 \\( y = \\log_{a} x + k \\)의 그래프와 그 역함수의 그래프가 두 점에서 만나고, 교점의 \\( x \\)좌표가 각각 1, 3일 때, \\( a + k \\)의 값은?",
+    choices: [
+      { text: "\\(\\sqrt{3}\\)", correct: true },
+      { text: "2", correct: false },
+      { text: "3", correct: false },
+      { text: "4", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = f(x) \\)의 그래프와 함수 \\( y = \\log_{a} x - 1 \\)의 그래프가 직선 \\( y = x \\)에 대하여 대칭이고, 점 \\((1, 9)\\)가 함수 \\( y = f(x) \\)의 그래프 위의 점일 때, 상수 \\( a \\)의 값은?",
+    choices: [
+      { text: "2", correct: false },
+      { text: "3", correct: true },
+      { text: "4", correct: false },
+      { text: "5", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = f(x) \\)의 그래프와 함수 \\( y = \\log_{2} (x - a) \\)의 그래프가 직선 \\( y = x \\)에 대하여 대칭이고, 점 \\((3, 5)\\)가 함수 \\( y = f(x) \\)의 그래프 위의 점일 때, 상수 \\( a \\)의 값은?",
+    choices: [
+      { text: "-3", correct: true },
+      { text: "-2", correct: false },
+      { text: "2", correct: false },
+      { text: "3", correct: false }
+    ]
+  },
+  {
+    question: "함수 \\( y = f(x) \\)의 그래프는 함수 \\( y = \\log_{2}(x - 1) + a \\)의 그래프와 직선 \\( y = x \\)에 대하여 대칭이다. 점 \\((4, 5)\\)가 함수 \\( y = f(x) \\)의 그래프 위의 점일 때, 상수 \\( a \\)의 값은?",
+    choices: [
+      { text: "1", correct: false },
+      { text: "2", correct: true },
+      { text: "3", correct: false },
+      { text: "4", correct: false }
+    ]
+  },
+  {
+    question: "로그함수 \\( y = \\log_{2} x + m \\)의 그래프와 그 역함수의 그래프가 두 점에서 만난다. 두 교점의 \\( x \\)좌표가 각각 1과 3일 때, \\( a + m \\)의 값은? (단, \\( a > 0 \\), \\( a \\neq 1 \\))",
+    choices: [
+      { text: "1", correct: false },
+      { text: "2", correct: true },
+      { text: "3", correct: false },
+      { text: "4", correct: false }
+    ]
+  },
+  {
+    question: "지수함수 \\( f(x) = a^x \\)의 역함수를 \\( g(x) \\)라 하자. \\( g(m) = 3 \\), \\( g(n) = 2 \\)일 때, \\( g(m^3 n) \\)의 값은?",
+    choices: [
+      { text: "6", correct: false },
+      { text: "8", correct: false },
+      { text: "10", correct: true },
+      { text: "12", correct: false }
+    ]
+  }
+];
+
+// -----------------------------
+// 2. 유틸 함수: 배열 셔플
+// -----------------------------
+function shuffleArray(array) {
+  // Fisher-Yates Shuffle
+  for(let i = array.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i+1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+// -----------------------------
+// 3. 전역 상태
+// -----------------------------
+let questionIndices = [];
+let currentIndex = 0;       // 현재 몇 번째 문제인지 (셔플된 인덱스 배열을 따라감)
+let score = 0;
+let lives = 3;
+let totalGameTime = 0;      // 전체 게임 시간(초)
+let gameInterval = null;    // setInterval 참조
+let energyInterval = null;  // 시간 제한 진행용 setInterval
+let timeLimit = 0;          // 난이도별 초(0이면 무제한)
+let energyRemaining = 100;  // 에너지바 100% 시작
+let difficultyScore = 10;   // 난이도별 문제당 점수
+let usedAllQuestions = false;
+
+// -----------------------------
+// 4. 게임 로직
+// -----------------------------
+function startGame() {
+  // 이름
+  const name = document.getElementById("playerName").value.trim();
+  if(!name){
+    alert("이름을 입력하세요.");
+    return;
+  }
+
+  // 난이도
+  const difficulty = document.getElementById("difficultySelect").value;
+  if(difficulty === "top"){ 
+    timeLimit = 20; 
+    difficultyScore = 20; 
+  } else if(difficulty === "high"){ 
+    timeLimit = 30; 
+    difficultyScore = 15; 
+  } else if(difficulty === "medium"){ 
+    timeLimit = 40; 
+    difficultyScore = 13; 
+  } else { 
+    timeLimit = 0;  // 무제한
+    difficultyScore = 10;
+  }
+
+  // 초기화
+  currentIndex = 0;
+  score = 0;
+  lives = 3;
+  totalGameTime = 0;
+  energyRemaining = 100;
+  usedAllQuestions = false;
+
+  document.getElementById("score").innerText = score;
+  document.getElementById("lives").innerText = lives;
+  document.getElementById("totalTime").innerText = totalGameTime.toString();
+
+  // 문제 인덱스 섞기
+  questionIndices = Array.from(allQuestions.keys());
+  shuffleArray(questionIndices);
+
+  // UI 보이기
+  document.getElementById("energyBarContainer").classList.add("hidden");
+  document.getElementById("nextBtn").classList.remove("hidden");
+  document.getElementById("questionArea").classList.remove("hidden");
+  document.getElementById("submitScoreBtn").classList.remove("hidden");
+
+  // 전체 시간 측정 타이머 시작
+  if(gameInterval) clearInterval(gameInterval);
+  gameInterval = setInterval(() => {
+    totalGameTime++;
+    document.getElementById("totalTime").innerText = totalGameTime.toString();
+  }, 1000);
+
+  // 첫 문제 표시
+  showQuestion();
+}
+
+// 현재 문제 표시
+function showQuestion() {
+  if(lives <= 0){
+    endGame("기회를 모두 소진했습니다. 게임이 종료됩니다.");
+    return;
+  }
+
+  // 문제 풀 세트에서 모두 소진했다면 => 그 다음부터는 무한 랜덤 출제
+  if(currentIndex >= allQuestions.length){
+    usedAllQuestions = true;
+  }
+
+  let qData;
+  if(!usedAllQuestions){
+    const realIndex = questionIndices[currentIndex];
+    qData = allQuestions[realIndex];
+  } else {
+    // 무한 랜덤 모드
+    const randomIdx = Math.floor(Math.random() * allQuestions.length);
+    qData = allQuestions[randomIdx];
+  }
+
+  // 보기 섞기
+  const choicesCopy = JSON.parse(JSON.stringify(qData.choices));
+  shuffleArray(choicesCopy);
+
+  // 문제 영역 구성
+  document.getElementById("questionText").innerHTML = qData.question;
+  const choicesDiv = document.getElementById("choices");
+  choicesDiv.innerHTML = "";
+
+  choicesCopy.forEach((ch, idx) => {
+    const div = document.createElement("div");
+    div.classList.add("choice");
+
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "currentChoice";
+    input.value = ch.text;  // 텍스트 자체를 값으로 저장
+    input.dataset.correct = ch.correct; // 정답 여부
+
+    const label = document.createElement("label");
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(" " + ch.text));
+
+    div.appendChild(label);
+    choicesDiv.appendChild(div);
+  });
+
+  // 정답 표시 영역 숨기기
+  document.getElementById("correctAnswer").classList.add("hidden");
+  document.getElementById("correctAnswer").innerText = "";
+
+  // 에너지바 리셋 & 시간제한 처리
+  if(energyInterval) clearInterval(energyInterval);
+
+  if(timeLimit > 0){
+    document.getElementById("energyBarContainer").classList.remove("hidden");
+    energyRemaining = 100;
+    setEnergyBar(energyRemaining);
+    const decrement = 100 / timeLimit / 10; 
+    // 예: timeLimit=20초라면, 1초마다 5씩 감소 -> 20초면 100%->0%
+    energyInterval = setInterval(() => {
+      energyRemaining -= decrement;
+      setEnergyBar(energyRemaining);
+      if(energyRemaining <= 0){
+        // 시간 초과 처리
+        clearInterval(energyInterval);
+        timeOut();
+      }
+    }, 100); // 0.1초마다 갱신
+  } else {
+    // 난이도 '하'라면 무제한
+    document.getElementById("energyBarContainer").classList.add("hidden");
+  }
+
+  // 수식 재렌더링
+  MathJax.typeset();
+}
+
+// 시간 초과 처리
+function timeOut(){
+  // 기회 1 감소, 오답처리와 동일하게 정답 표시
+  lives--;
+  document.getElementById("lives").innerText = lives;
+  showCorrectAnswer(true); // timeOut=true
+}
+
+// 정답 표시
+function showCorrectAnswer(timeOut=false){
+  const radios = document.getElementsByName("currentChoice");
+  let correctText = "";
+  for(let r of radios){
+    if(r.dataset.correct === "true"){
+      correctText = r.value; 
+      break;
+    }
+  }
+  const answerDiv = document.getElementById("correctAnswer");
+  if(timeOut) {
+    answerDiv.innerText = "시간 초과! 정답: " + correctText;
+  } else {
+    answerDiv.innerText = "틀렸습니다. 정답: " + correctText;
+  }
+  answerDiv.classList.remove("hidden");
+
+  if(lives <= 0){
+    endGame("기회를 모두 소진했습니다. 게임이 종료됩니다.");
+  }
+}
+
+// -----------------------------
+// 5. 버튼 이벤트
+// -----------------------------
+document.getElementById("startBtn").addEventListener("click", startGame);
+
+document.getElementById("nextBtn").addEventListener("click", () => {
+  // 선택 확인
+  const radios = document.getElementsByName("currentChoice");
+  let chosen = null;
+  for(let r of radios){
+    if(r.checked){
+      chosen = r;
+      break;
+    }
+  }
+
+  // 만약 답을 골랐다면
+  if(chosen){
+    if(chosen.dataset.correct === "true"){
+      // 정답
+      score += difficultyScore;
+      document.getElementById("score").innerText = score;
+    } else {
+      // 오답
+      lives--;
+      document.getElementById("lives").innerText = lives;
+      showCorrectAnswer(false);
+    }
+  } else {
+    // 선택 안 했으면 그냥 넘어감(정답 처리 없이)
+    // 문제에서 "시간이 지나거나 틀리면 기회 소진"이라고 했으니
+    // 여기서는 "답을 안 고르고 넘어가면" 특별히 깎지 않는다고 가정
+  }
+
+  // 기회가 남아 있으면 다음 문제
+  if(lives <= 0){
+    endGame("기회를 모두 소진했습니다. 게임이 종료됩니다.");
+  } else {
+    if(!usedAllQuestions) {
+      currentIndex++;
+    }
+    showQuestion();
+  }
+});
+
+// 점수 전송 버튼
+document.getElementById("submitScoreBtn").addEventListener("click", () => {
+  // saveData 호출
+  const gameTitle = "지수함수와 로그함수의 관계";
+  const name = document.getElementById("playerName").value.trim();
+  const elapsedTime = totalGameTime;
+  saveData(gameTitle, name, score, elapsedTime);
+});
+
+// -----------------------------
+// 6. 게임 종료
+// -----------------------------
+function endGame(msg){
+  if(gameInterval){
+    clearInterval(gameInterval);
+    gameInterval = null;
+  }
+  if(energyInterval){
+    clearInterval(energyInterval);
+    energyInterval = null;
+  }
+  alert(msg);
+}
+
+// -----------------------------
+// 7. 에너지바
+// -----------------------------
+function setEnergyBar(percent){
+  const bar = document.getElementById("energyBar");
+  if(percent < 0) percent = 0;
+  bar.style.width = percent + "%";
+}
+
+// -----------------------------
+// 8. 데이터 전송 함수
+// (요청에 따라 그대로 삽입)
+// -----------------------------
+async function saveData(game, name, score, elapsedTime) {
+  const FUNCTION_URL = "https://us-central1-record-f420d.cloudfunctions.net/report";
+  const requestData = {
+      game,
+      name,
+      score: parseInt(score, 10),
+      elapsedTime: parseInt(elapsedTime, 10)
+  };
+
+  try {
+      const response = await fetch(FUNCTION_URL, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestData)
+      });
+
+      const responseData = await response.json();
+
+      if (response.ok) {
+          document.getElementById('response').innerText =
+              `성공: ${JSON.stringify(responseData, null, 2)}`;
+      } else {
+          document.getElementById('response').innerText =
+              `오류: ${JSON.stringify(responseData, null, 2)}`;
+      }
+  } catch (error) {
+      console.error('요청 실패:', error);
+      document.getElementById('response').innerText =
+          `네트워크 오류: ${error.message}`;
+  }
+}
+</script>
+
+</body>
+</html>
